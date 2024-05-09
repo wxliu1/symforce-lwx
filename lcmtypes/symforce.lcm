@@ -1,0 +1,353 @@
+package sym;
+
+struct key_t {
+  // TODO(hayk): Issue for alignment?
+  byte letter;
+  int64_t subscript;
+  int64_t superscript;
+};
+
+struct index_entry_t {
+  key_t key;
+  sym.type_t type;
+
+  // Location within the storage or tangent vector, depending on context
+  int32_t offset;
+
+  // Size parameters
+  int32_t storage_dim;
+  int32_t tangent_dim;
+};
+
+struct index_t {
+  int32_t storage_dim;
+  int32_t tangent_dim;
+  index_entry_t entries[];
+};
+
+struct values_t {
+  index_t index;
+  double data[];
+};
+
+struct valuesf_t {
+  index_t index;
+  float data[];
+};
+
+// ------------------------------------------------------------------------------------------------
+// Storage for the linearization of a factor
+// ------------------------------------------------------------------------------------------------
+
+#cpp_no_display
+struct linearized_dense_factor_t {
+  eigen_lcm.VectorXd residual;  // b
+  eigen_lcm.MatrixXd jacobian;  // J
+
+  eigen_lcm.MatrixXd hessian;  // H, JtJ
+  eigen_lcm.VectorXd rhs;      // Jtb
+};
+
+// Same as linearized_dense_factor_t but for floats.
+#cpp_no_display
+struct linearized_dense_factorf_t {
+  eigen_lcm.VectorXf residual;  // b
+  eigen_lcm.MatrixXf jacobian;  // J
+
+  eigen_lcm.MatrixXf hessian;  // H, JtJ
+  eigen_lcm.VectorXf rhs;      // Jtb
+};
+
+// ------------------------------------------------------------------------------------------------
+// Helpers for building a full optimization problem from linearized factors
+// ------------------------------------------------------------------------------------------------
+
+// Index information for a single key within a linearized factor
+// Aids with rapid repeated linearization
+struct linearization_dense_key_helper_t {
+  // Offset of this key within the factor's state vector
+  int32_t factor_offset;
+  // Offset of this key within the whole problem's state vector
+  int32_t combined_offset;
+  // Tangent dimension of the key
+  int32_t tangent_dim;
+  // For each column of this key's block in the factor jacobian, the sparse storage valuePtr array
+  // offsets
+  int32_t jacobian_storage_col_starts[];
+  // For this key, then each other key (from 0 to this key's index); and each column in that key;
+  // the sparse storage valuePtr array offsets
+  int32_t hessian_storage_col_starts[];
+};
+
+// Index information for a linearized factor into the combined problem
+// Aids with rapid repeated linearization
+struct linearization_dense_factor_helper_t {
+  // Total residual dimension of the factor
+  int32_t residual_dim;
+  // Offset of this factor's residual slice within the whole problem residual
+  int32_t combined_residual_offset;
+  // Data about each key's state offsets
+  linearization_dense_key_helper_t key_helpers[];
+};
+
+struct linearization_offsets_t {
+  // Offset of this key within the factor's state vector
+  int32_t factor_offset;
+  // Offset of this key within the whole problem's state vector
+  int32_t combined_offset;
+  // Tangent dimension of the key
+  int32_t tangent_dim;
+};
+
+struct linearization_sparse_factor_helper_t {
+  // Total residual dimension of the factor
+  int32_t residual_dim;
+  // Offset of this factor's residual slice within the whole problem residual
+  int32_t combined_residual_offset;
+  // Data about each key's state offsets
+  linearization_offsets_t key_helpers[];
+
+  // Mapping from factor jacobian flat storage into problem jacobian flat storage
+  int32_t jacobian_index_map[];
+
+  // Mapping from factor hessian flat storage into problem hessian flat storage
+  int32_t hessian_index_map[];
+};
+
+enum lambda_update_type_t {
+  INVALID = 0,
+  // Multiply lambda by a constant based on whether each step was accepted
+  STATIC = 1,
+  // Change lambda intelligently based on the gain ratio, instead of just multiplying by a constant.
+  //
+  // This uses the update rule proposed in "DAMPING PARAMETER IN MARQUARDT’S METHOD", page 10:
+  // https://www.imm.dtu.dk/documents/ftp/tr99/tr05_99.pdf.
+  //
+  // This works better for some problems, for example the "Bundle Adjustment in the Large" problems.
+  // At least with the recommended defaults for dynamic_lambda_update_params, it does not reduce
+  // lambda as aggressively as the static update defaults, so in cases where the problem is very
+  // quadratic at the minimum it does not converge as quickly.
+  DYNAMIC = 2,
+};
+
+// Parameters for the Optimizer
+struct optimizer_params_t {
+  // Print information for every iteration?
+  boolean verbose;
+
+  // Whether the optimizer should record debugging stats such as the optimized values, residual,
+  // jacobian, etc. computed at each iteration of the optimization.
+  boolean debug_stats;
+  // Check derivatives for consistency.  This computes the numerical jacobian of the residual, and
+  // verifies that it matches the jacobian computed by the linearization function.  It also verifies
+  // that the Hessian and RHS computed by the linearization function match J^T * J and J^T * b
+  boolean check_derivatives;
+  // Whether the optimizer should compute jacobians.  Required for check_derivatives, and for
+  // computing linear error at each step.
+  boolean include_jacobians;
+  // If true, will perform additional sanity checks while optimizing which may be expensive.  This
+  // uses additional compute but not additional memory except for logging.
+  boolean debug_checks;
+
+  // Damping value (lambda) on the first iteration of the LM loop
+  double initial_lambda;
+  // Smallest allowed value for lambda
+  double lambda_lower_bound;
+  // Largest allowed value for lambda
+  double lambda_upper_bound;
+
+  // Method for updating lambda, see lambda_update_type_t
+  lambda_update_type_t lambda_update_type;
+
+  // [Used if lambda_update_type == STATIC] Factor greater than one to multiply by lambda
+  double lambda_up_factor;
+  // [Used if lambda_update_type == STATIC] Factor less than one to multiply by lambda
+  double lambda_down_factor;
+
+  // [Used if lambda_update_type == DYNAMIC] Lambda update parameter beta.  This is the initial
+  // value of nu, and scales the update for lambda.  Recommended value is 2
+  double dynamic_lambda_update_beta;
+  // [Used if lambda_update_type == DYNAMIC] Lambda update parameter gamma.  This is the factor by
+  // which lambda is reduced when the gain is >= 1.  Recommended value is 3
+  double dynamic_lambda_update_gamma;
+  // [Used if lambda_update_type == DYNAMIC] Exponent in the power law for the updated lambda,
+  // should be an odd positive integer. Recommended value is 3
+  int32_t dynamic_lambda_update_p;
+
+  // Damp the Hessian adaptively based on the values on its diagonal?
+  boolean use_diagonal_damping;
+  // Damp the Hessian with a constant lambda?
+  boolean use_unit_damping;
+  // Use the elementwise max of the diagonal over all past iterations, instead
+  // of the current diagonal? (Only used when use_diagonal_damping is turned on)
+  boolean keep_max_diagonal_damping;
+  // Initial values of the diagonal when using keep_max_diagonal_damping (i.e.
+  // if the max for a particular element on the diagonal is less than
+  // diagonal_damping_min, that element of the diagonal is set to
+  // diagonal_damping_min)
+  double diagonal_damping_min;
+
+  // Max number of LM iterations to run in an optimization
+  int32_t iterations;
+  // Early exit from the optimization if the absolute value of the relative reduction is
+  // less than this amount
+  double early_exit_min_reduction;
+  // Allow uphill movements in the optimization?
+  boolean enable_bold_updates;
+}
+
+// Additional parameters for the GNCOptimizer
+struct optimizer_gnc_params_t {
+  // The convexity param is stepped each time we early-exit with this threshold.
+  double gnc_update_min_reduction;
+
+  // Initial mu value.
+  double mu_initial;
+
+  // Amount to change mu each step.
+  double mu_step;
+
+  // Maximum mu value
+  //
+  // If mu_initial >= mu_max, the GncOptimizer will behave like an Optimizer; it will iterate to
+  // convergence once, with the value of gnc_mu_key set to mu_initial and convergence threshold
+  // early_exit_min_reduction.
+  double mu_max;
+}
+
+// Debug stats for a single iteration of a Levenberg Marquardt optimization
+struct optimization_iteration_t {
+  // Zero-indexed iteration number (Information before the first iteration is
+  // included at index -1)
+  int16_t iteration;
+
+  // Value of lambda at this iteration
+  double current_lambda;
+  // Error after the iteration, using the linearized cost
+  double new_error_linear;
+  // Error after the iteration, using the full nonlinear cost function
+  double new_error;
+  // Relative reduction in error between the initial and updated states for
+  // this iteration
+  double relative_reduction;
+
+  // Was the update accepted?
+  boolean update_accepted;
+  // Angle between previous update and current update
+  double update_angle_change;
+
+  // The update, values, residual, and jacobian are only populated when debug_stats is true,
+  // otherwise they are size 0
+
+  // The update at this step
+  eigen_lcm.VectorXd update;
+
+  // The Values at this step
+  values_t values;
+
+  // The problem residual
+  eigen_lcm.VectorXd residual;
+  // The problem jacobian exactly if dense, or as CSC format sparse data column vector if sparse
+  eigen_lcm.MatrixXd jacobian_values;
+}
+
+// The structure of a sparse matrix in CSC format, not including the numerical values
+// For a description of the format, see
+// https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_column_(CSC_or_CCS)
+// In the comments below, assume an M x N matrix with nnz nonzeros
+struct sparse_matrix_structure_t {
+  // The row for each nonzero entry in the matrix
+  eigen_lcm.VectorXi row_indices;  // size nnz
+
+  // The index into row_indices (and the values) of the start of each column
+  eigen_lcm.VectorXi column_pointers;  // size N
+
+  // The shape (M, N) of the sparse matrix
+  int64_t shape[2];
+}
+
+#protobuf
+enum optimization_status_t {
+  // Uninitialized enum value
+  INVALID = 0,
+  // The optimization converged successfully
+  SUCCESS = 1,
+  // We hit the iteration limit before converging
+  HIT_ITERATION_LIMIT = 2,
+  // The solver failed to converge for some reason (other than hitting the iteration limit)
+  FAILED = 3,
+}
+
+#protobuf
+enum levenberg_marquardt_solver_failure_reason_t : int32_t {
+  // Uninitialized enum value
+  INVALID = 0,
+  // We could not increase lambda high enough to make progress
+  LAMBDA_OUT_OF_BOUNDS = 1,
+  // The initial error was not finite (either NaN or Inf)
+  INITIAL_ERROR_NOT_FINITE = 2,
+
+}
+
+// Debug stats for a full optimization run
+struct optimization_stats_t {
+  optimization_iteration_t iterations[];
+
+  // Index into iterations of the best iteration (containing the optimal Values)
+  int32_t best_index;
+
+  // What was the result of the optimization? (did it converge, fail, etc.)
+  optimization_status_t status;
+
+  // If status == FAILED, why?  This should be cast to the Optimizer::FailureReason enum
+  // for the nonlinear solver you used.
+  int32_t failure_reason;
+
+  /// The sparsity pattern of the problem jacobian
+  ///
+  /// Only filled if Optimizer created with debug_stats = true and include_jacobians = true,
+  /// otherwise default constructed.
+  ///
+  /// If using a dense linearization, only the shape field will be filled.
+  sparse_matrix_structure_t jacobian_sparsity;
+
+  /// The permutation used by the linear solver
+  ///
+  /// Only filled if using an Optimizer created with debug_stats = true and a linear solver that
+  /// exposes Permutation() (such as the default SparseCholeskySolver).  Otherwise, will be default
+  /// constructed.
+  eigen_lcm.VectorXi linear_solver_ordering;
+
+  /// The sparsity pattern of the cholesky factor L
+  ///
+  /// Only filled if using an Optimizer created with debug_stats = true and a linear solver that
+  /// exposes L() (such as the default SparseCholeskySolver).  Otherwise, will be default
+  /// constructed.
+  sparse_matrix_structure_t cholesky_factor_sparsity;
+}
+
+struct imu_biases_t {
+  eigen_lcm.Vector3d accel_bias;
+  eigen_lcm.Vector3d gyro_bias;
+}
+
+struct imu_integrated_measurement_delta_t {
+  double Dt;
+  eigen_lcm.Quaterniond DR;
+  eigen_lcm.Vector3d Dv;
+  eigen_lcm.Vector3d Dp;
+}
+
+struct imu_integrated_measurement_derivatives_t {
+  eigen_lcm.Matrix3d DR_D_gyro_bias;
+  eigen_lcm.Matrix3d Dv_D_accel_bias;
+  eigen_lcm.Matrix3d Dv_D_gyro_bias;
+  eigen_lcm.Matrix3d Dp_D_accel_bias;
+  eigen_lcm.Matrix3d Dp_D_gyro_bias;
+}
+
+struct imu_integrated_measurement_t {
+  imu_biases_t biases;
+  imu_integrated_measurement_delta_t delta;
+  imu_integrated_measurement_derivatives_t derivatives;
+}

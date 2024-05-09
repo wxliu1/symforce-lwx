@@ -1,0 +1,81 @@
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="light"]) [href$="#gh-light-mode-only"],
+  body:not([data-theme="light"]) [src$="#gh-light-mode-only"] {
+    display: none;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  body:not([data-theme="dark"]) [href$="#gh-dark-mode-only"],
+  body:not([data-theme="dark"]) [src$="#gh-dark-mode-only"] {
+    display: none;
+  }
+}
+
+body[data-theme="dark"] [href$="#gh-light-mode-only"],
+body[data-theme="dark"] [src$="#gh-light-mode-only"] {
+  display: none;
+}
+
+body[data-theme="light"] [href$="#gh-dark-mode-only"],
+body[data-theme="light"] [src$="#gh-dark-mode-only"] {
+  display: none;
+}
+
+/* Hide "SymForce Home" text at the top of the README */
+section#symforce-home h1 {
+  display: none;
+}
+
+/* Hide unnecessary vertical scrollbars on mathjax on chrome? */
+.math-wrapper {
+  overflow-y: hidden;
+}
+
+/*
+ * Font size tweaks
+ */
+
+/* Python */
+
+/* h1 module names smaller */
+section[id^="module-"] h1 {
+  font-size: 1.5em;
+}
+
+/* `class` keywords larger */
+dl.py.class > dt.sig > em.property {
+  font-size: 1.3em;
+}
+
+/* class names larger */
+dl.py.class > dt.sig > span.sig-name {
+  font-size: 1.8em;
+}
+
+/* `exception` keywords larger */
+dl.py.exception > dt.sig > em.property {
+  font-size: 1.3em;
+}
+
+/* exception names larger */
+dl.py.exception > dt.sig > span.sig-name {
+  font-size: 1.8em;
+}
+
+/* C++ */
+
+/* h1 class names smaller */
+section[id^="class-"] h1 {
+  font-size: 1.5em;
+}
+
+/* `class` keywords larger */
+dl.cpp.class > dt.sig > span.k:last-of-type {
+  font-size: 1.3em;
+}
+
+/* class names larger */
+dl.cpp.class > dt.sig > span.sig-name:last-of-type {
+  font-size: 1.8em;
+}
