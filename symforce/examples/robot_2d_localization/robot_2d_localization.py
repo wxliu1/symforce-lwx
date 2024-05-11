@@ -51,9 +51,9 @@ def build_initial_values() -> T.Tuple[Values, int, int]:
     """
     num_poses = 3
     num_landmarks = 3
-
+    # 关键字参数是指在函数调用时，通过参数名指定参数值，这样可以不用担心参数的顺序。
     initial_values = Values(
-        poses=[sf.Pose2.identity()] * num_poses, # world系下位姿
+        poses=[sf.Pose2.identity()] * num_poses, # world系下的位姿
         landmarks=[sf.V2(-2, 2), sf.V2(1, -3), sf.V2(5, 2)], # world系下的坐标
         distances=[1.7, 1.4], # "0, 1"帧和"1, 2"帧的相对距离
         angles=np.deg2rad([[55, 245, -35], [95, 220, -20], [125, 220, -20]]).tolist(), # 3个帧的3个路标点的角度测量值
