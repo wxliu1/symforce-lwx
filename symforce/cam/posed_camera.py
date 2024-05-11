@@ -80,6 +80,7 @@ class PosedCamera(Camera):
         global_point = self.pose * camera_point
         return global_point, is_valid
 
+    # 投影一个像素点从一个相机到另一个相机，得到在目标相机像素平面下的像素点
     def warp_pixel(
         self,
         pixel: geo.Vector2,
@@ -112,12 +113,19 @@ class PosedCamera(Camera):
         # can be == 0 without a special case.
 
         # Project out to a unit ray.
+        # 利用相机内参，将像素坐标逆投影为归一化坐标
         camera_ray, is_valid_point = self.camera_ray_from_pixel(pixel, epsilon)
+        # 归一化坐标(X/Z, Y/Z, 1)除以其2范数得到单位坐标(X/d, Y/d, Z/d), 其中d=sqrt(X^2 + Y^2 + Z^2)
         camera_point = camera_ray / camera_ray.norm()
 
         # Transform into the other camera at this inverse range.
         # NOTE(ryan): expand out the math here, since grouping (R0*R1)*p is more operations
         # than R0*(R1*p).
+        # 设源相机的位姿为(R0, t0), 目标相机的位姿为(R1, t1).
+        # 则两帧之间的位姿变换T^1_0(或者T_{10}或者T_1^-1 * T_0)为: R = R_1^-1 * R_0,  t= R_1^-1 * (t0 - t1)
+        # p_1 = R*[p_0/inv_range] + t 然后scale它，乘以inv_range，
+        # 得到新p_1^{\prime} = inv_range * p_1 = R*p_0 + t*inv_range
+        # note: 公式(R0*R1)*p的计算效率比R0*(R1*p)差很多，故而用后者
         transformed_point = target_cam.pose.R.inverse() * (
             self.pose.R * camera_point + (self.pose.t - target_cam.pose.t) * inverse_range
         )
