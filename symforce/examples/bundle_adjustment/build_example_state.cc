@@ -16,6 +16,21 @@ namespace bundle_adjustment {
 
 namespace {
 
+// std::mt19937是C++标准库中的一个伪随机数生成器类
+// 一个有着19937位状态大小的能够生成32位数的梅森旋转伪随机生成器
+
+/*
+ * 关于正态分布函数的用法: std::normal_distribution<type> distribution
+  // With normal distribution, we can create events like "has a great chance
+  // to get medium result, and has a little chance to get bad or too good result"
+  
+  std::default_random_engine generator;
+  std::normal_distribution<double> distribution(5.0,2.0);
+  generator.seed(clock()); // std pesudo also needs seed to avoid generating fixed random value.
+
+  double number = distribution(generator);
+*/    
+
 /**
  * Build two posed cameras and put them into values, with similar but not identical poses looking
  * into the same general area and identical calibrations.  The ground truth posed cameras are
@@ -24,9 +39,15 @@ namespace {
  */
 std::vector<sym::PosedCamera<sym::LinearCameraCald>> AddViews(
     const BundleAdjustmentProblemParams& params, std::mt19937& gen, sym::Valuesd* const values) {
+  // 随机生成相机位姿
   const sym::Pose3d view0 = sym::Random<sym::Pose3d>(gen);
+  // 给定一个扰动
   sym::Vector6d perturbation;
   perturbation << 0.1, -0.2, 0.1, 2.1, 0.4, -0.2;
+  // 用给定的vector对view0进行扰动得到view1
+  // 其中扰动vector为扰动小量乘以服从正态分布的随机值，正态分布（高斯分布）的期望是0，标准差为params.pose_difference_std
+  // 因为期望是0，这意味着大概率产生一个服从高斯分布的小量，
+  // 因而view1大概率是view0经过一个小的扰动得到的
   const sym::Pose3d view1 = view0.Retract(
       perturbation * std::normal_distribution<double>(0, params.pose_difference_std)(gen));
 

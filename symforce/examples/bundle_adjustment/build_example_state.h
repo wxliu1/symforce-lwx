@@ -15,18 +15,19 @@ namespace bundle_adjustment {
 
 struct BundleAdjustmentProblemParams {
   double epsilon = 1e-10;
-  int num_views = 2;
-  int num_landmarks = 20;
+  int num_views = 2; // 2个camera poses
+  int num_landmarks = 20; // 20个feature correspondences
   double reprojection_error_gnc_scale = 10;
   double noise_px = 5;
   double num_outliers = 0;
   double landmark_relative_range_noise = 0.5;
-  double pose_difference_std = 2;
+  double pose_difference_std = 2; //正态分布的标准差
   double pose_noise = 0.1;
   double pose_prior_noise = 0.3;
   Eigen::Vector2i image_shape{1280, 720};
 };
 
+// 可以指定枚举成员的类型(这里指定为char类型)，通过在enum后加冒号再加数据类型来指明数据类型
 enum Var : char {
   VIEW = 'v',                  // Pose3d
   CALIBRATION = 'c',           // Vector4d

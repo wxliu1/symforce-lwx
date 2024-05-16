@@ -209,6 +209,7 @@ def generate_bearing_residual_code(
     # Create a Codegen object for the symbolic residual function, targeted at C++
     codegen = Codegen.function(bearing_residual, config=CppConfig())
 
+    # 生成残差函数
     # Generate the function and print the code
     metadata = codegen.generate_function(output_dir=output_dir, skip_directory_nesting=True)
     if print_code:
@@ -221,6 +222,7 @@ def generate_bearing_residual_code(
     # by introspecting and symbolically differentiating the given arguments
     codegen_with_linearization = codegen.with_linearization(which_args=["pose"])
 
+    # 生成构建因子图的函数
     # Generate the function and print the code
     metadata = codegen_with_linearization.generate_function(
         output_dir=output_dir, skip_directory_nesting=True
@@ -242,6 +244,7 @@ def generate_odometry_residual_code(
     # Create a Codegen object for the symbolic residual function, targeted at C++
     codegen = Codegen.function(odometry_residual, config=CppConfig())
 
+    # 生成残差函数
     # Generate the function and print the code
     metadata = codegen.generate_function(output_dir=output_dir, skip_directory_nesting=True)
     if print_code:
@@ -254,6 +257,7 @@ def generate_odometry_residual_code(
     # by introspecting and symbolically differentiating the given arguments
     codegen_with_linearization = codegen.with_linearization(which_args=["pose_a", "pose_b"])
 
+    # 生成因子图函数
     # Generate the function and print the code
     metadata = codegen_with_linearization.generate_function(
         output_dir=output_dir, skip_directory_nesting=True
