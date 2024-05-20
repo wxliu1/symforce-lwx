@@ -37,6 +37,12 @@ namespace {
  * returned; the first view is inserted into the Values with its ground truth value, and the second
  * is inserted with some noise on the pose.
  */
+/*
+ * 建立两个PosedCamera对象，并存储于Values容器，它们具有类似但不相等的位姿，相同的区域(分辨率)和内参。
+ * 该函数返回posed cameras的ground truth.
+ * 第一个插入Valuesd的view, 位姿具有ground truth 真值；
+ * 第二个插入Values的view，位姿带有噪声。
+ */
 std::vector<sym::PosedCamera<sym::LinearCameraCald>> AddViews(
     const BundleAdjustmentProblemParams& params, std::mt19937& gen, sym::Valuesd* const values) {
   // 随机生成相机位姿
@@ -51,11 +57,19 @@ std::vector<sym::PosedCamera<sym::LinearCameraCald>> AddViews(
   const sym::Pose3d view1 = view0.Retract(
       perturbation * std::normal_distribution<double>(0, params.pose_difference_std)(gen));
 
+  // sym::LinearCameraCald为sym::LinearCameraCal<double>类型
+  // 针孔相机模型Standard pinhole camera w/ four parameters [fx, fy, cx, cy].
+  // 内参: (fx, fy) representing focal length; (cx, cy) representing principal point.
+  // 对应的函数原型inline LinearCameraCal(const Eigen::Matrix<Scalar, 2, 1> &focal_length, const Eigen::Matrix<Scalar, 2, 1> &principal_point)
   const sym::LinearCameraCald camera_cal(Eigen::Vector2d(740, 740), Eigen::Vector2d(639.5, 359.5));
+  // sym::PosedCamera是一个相机类: Camera with a given pose, camera calibration, and an optionally specified image size.
   const sym::PosedCamera<sym::LinearCameraCald> cam0(view0, camera_cal, params.image_shape);
   const sym::PosedCamera<sym::LinearCameraCald> cam1(view1, camera_cal, params.image_shape);
 
+  // 函数原型: std::enable_if_t<!kIsEigenType<T>, bool> Set(const Key &key, const T &value)
+  // 添加或者更新值: Add or update a value by key. Returns true if added, false if updated.
   values->Set({Var::VIEW, 0}, cam0.Pose());
+  // cam0.Calibration()返回的是sym::LinearCameraCald类型的对象
   values->Set({Var::CALIBRATION, 0}, cam0.Calibration());
 
   values->Set({Var::VIEW, 1},
@@ -74,6 +88,7 @@ void AddPosePriors(const std::vector<sym::PosedCamera<sym::LinearCameraCald>>& c
                    const BundleAdjustmentProblemParams& params, std::mt19937& gen,
                    sym::Valuesd* const values) {
   // First, create the 0-weight priors:
+  // 首先，创建0权重先验
   for (int i = 0; i < params.num_views; i++) {
     for (int j = 0; j < params.num_views; j++) {
       values->Set({Var::POSE_PRIOR_T, i, j}, sym::Pose3d());
