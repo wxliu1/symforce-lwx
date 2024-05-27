@@ -52,7 +52,7 @@ std::vector<sym::PosedCamera<sym::LinearCameraCald>> AddViews(
   perturbation << 0.1, -0.2, 0.1, 2.1, 0.4, -0.2;
   // 用给定的vector对view0进行扰动得到view1
   // 其中扰动vector为扰动小量乘以服从正态分布的随机值，正态分布（高斯分布）的期望是0，标准差为params.pose_difference_std
-  // 因为期望是0，这意味着大概率产生一个服从高斯分布的小量，
+  // 因为期望是0，这意味着大概率产生一个服从高斯分布的小量（在0附近），
   // 因而view1大概率是view0经过一个小的扰动得到的
   const sym::Pose3d view1 = view0.Retract(
       perturbation * std::normal_distribution<double>(0, params.pose_difference_std)(gen));
@@ -84,6 +84,9 @@ std::vector<sym::PosedCamera<sym::LinearCameraCald>> AddViews(
  * weight in this example, and therefore have no effect.  The priors between sequential views are
  * set to be the actual transform between the ground truth poses, plus some noise.
  */
+// 添加高斯先验到每对视图(view)之间的相对位姿上. 在本例中大部分先验有0权重，因此没有作用。
+// 在连续的views之间的先验被设置为ground truth 位姿之间的实际变换，添加一些噪声
+// 序列视图之间的先验被设置为地面真实姿态之间的实际变换，再加上一些噪声。 
 void AddPosePriors(const std::vector<sym::PosedCamera<sym::LinearCameraCald>>& cams,
                    const BundleAdjustmentProblemParams& params, std::mt19937& gen,
                    sym::Valuesd* const values) {
@@ -91,18 +94,26 @@ void AddPosePriors(const std::vector<sym::PosedCamera<sym::LinearCameraCald>>& c
   // 首先，创建0权重先验
   for (int i = 0; i < params.num_views; i++) {
     for (int j = 0; j < params.num_views; j++) {
+      // 设置先验位姿的变换：单位阵加平移(0, 0, 0)
       values->Set({Var::POSE_PRIOR_T, i, j}, sym::Pose3d());
+      // 设置信息矩阵的平方根，为 6*6 的0矩阵，此即为权重
       values->Set({Var::POSE_PRIOR_SQRT_INFO, i, j}, sym::Matrix66d::Zero());
     }
   }
 
   // Now, the actual priors between sequential views:
+  // 现在，序列视图之间的实际先验：
   for (int i = 0; i < params.num_views - 1; i++) {
+    // 取出连续两帧的位姿
     const auto& first_view = cams[i].Pose();
     const auto& second_view = cams[i + 1].Pose();
+    // 设置位姿先验变换：first_view到second_view的增量四元数，由 q_2 = q_1 * delta_q , q_2 = q_1 * q_{12}
+    // 可知：delta_q = q_{12}
+    // 然后再加入噪声，对位姿增量做一个扰动
     values->Set({Var::POSE_PRIOR_T, i, i + 1},
                 first_view.Between(second_view)
                     .Retract(params.pose_prior_noise * sym::Random<sym::Vector6d>(gen)));
+    // 设置先验信息矩阵：单位阵除以噪声
     values->Set({Var::POSE_PRIOR_SQRT_INFO, i, i + 1},
                 sym::Matrix66d::Identity() / params.pose_prior_noise);
   }
