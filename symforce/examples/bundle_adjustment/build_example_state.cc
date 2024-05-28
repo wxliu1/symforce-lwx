@@ -38,10 +38,10 @@ namespace {
  * is inserted with some noise on the pose.
  */
 /*
- * 建立两个PosedCamera对象，并存储于Values容器，它们具有类似但不相等的位姿，相同的区域(分辨率)和内参。
+ * 建立两个PosedCamera对象，并存储于values容器，它们具有类似但不相等的位姿，相同的区域(分辨率)和内参。
  * 该函数返回posed cameras的ground truth.
- * 第一个插入Valuesd的view, 位姿具有ground truth 真值；
- * 第二个插入Values的view，位姿带有噪声。
+ * 第一个插入values的view, 位姿具有ground truth 真值；
+ * 第二个插入values的view，位姿带有噪声。
  */
 std::vector<sym::PosedCamera<sym::LinearCameraCald>> AddViews(
     const BundleAdjustmentProblemParams& params, std::mt19937& gen, sym::Valuesd* const values) {
@@ -125,35 +125,75 @@ void AddPosePriors(const std::vector<sym::PosedCamera<sym::LinearCameraCald>>& c
  * weight to apply to that correspondence's cost.  Each landmark has its inverse range in the source
  * view, as well as a Gaussian inverse range prior with mean and sigma.
  */
+// 添加随机采样的correspondences和相应的逆范围路标
+// 对每个correspondence, 在源图像和目标图像中有像素坐标，以及一个应用于correspondence代价的权重
+// 每个路标在源视图中有它的逆范围，以及一个具有均值和sigma的高斯逆范围先验。
 void AddCorrespondences(const std::vector<sym::PosedCamera<sym::LinearCameraCald>>& cams,
                         const BundleAdjustmentProblemParams& params, std::mt19937& gen,
                         sym::Valuesd* const values) {
   // Sample random correspondences
+  //step1 随机采样特征。输入参数为图像分辨率，特征点个数
   const std::vector<Eigen::Vector2d> source_coords =
       sym::example_utils::PickSourceCoordsRandomlyFromGrid<double>(params.image_shape,
                                                                    params.num_landmarks, gen);
+  //step2 根据特征点个数，随机产生逆深度
   const std::vector<double> source_inverse_ranges =
       sym::example_utils::SampleInverseRanges<double>(params.num_landmarks, gen);
 
   std::vector<std::pair<Eigen::Matrix<double, 2, 1>, double>> source_observations;
+  /*
+   *
+   * transform在指定的范围内应用于给定的操作，并将结果存储在指定的另一个范围内。transform函数包含在<algorithm>头文件中。
+   * 
+   * 二元操作
+    template <class InputIterator1, class InputIterator2,class OutputIterator, class BinaryOperation>
+    OutputIterator transform (InputIterator1 first1, InputIterator1 last1,InputIterator2 first2, OutputIterator result,BinaryOperation binary_op);
+   *
+   *
+   * 对于二元操作，使用[first1, last1)范围内的每个元素作为第一个参数调用binary_op,
+   * 并以first2开头的范围内的每个元素作为第二个参数调用binary_op,每次调用返回的值都存储在以result开头的范围内。
+   * 给定的binary_op将被连续调用last1-first1次。
+   * binary_op可以是函数指针或函数对象或lambda表达式。
+   * 
+   * 
+   * std::back_inserter : 返回尾部插入型迭代器，内部会调用容器的push_back()方法来将数据插入容器的尾部
+   * 
+   */
+
+  // step3 这里将前两步产生的像素坐标，逆深度形成一个pair存储到source_observations中
   std::transform(
       source_coords.begin(), source_coords.end(), source_inverse_ranges.begin(),
       std::back_inserter(source_observations),
       [](const auto& uv, const double inverse_range) { return std::make_pair(uv, inverse_range); });
+  // step4 根据源相机的特征点，以及相对位姿关系，生成目标相机的correspondences
   const std::vector<sym::example_utils::Correspondence<double>> correspondences =
       sym::example_utils::GenerateCorrespondences(cams[0], cams[1], source_observations, gen,
                                                   params.epsilon, params.noise_px,
                                                   params.num_outliers);
 
+  /*
+   * std::normal_distribution补充说明：
+   * 正态分布有两个参数，即期望（均数）μ和标准差σ，σ^2为方差
+   * 
+   * μ是正态分布的位置参数，描述正态分布的集中趋势位置。概率规律为取与μ邻近的值的概率大，而取离μ越远的值的概率越小。正态分布以X=μ为对称轴，左右完全对称。
+   * 
+   * σ描述正态分布资料数据分布的离散程度，σ越大，数据分布越分散，σ越小，数据分布越集中。也称为是正态分布的形状参数，σ越大，曲线越扁平，反之，σ越小，曲线越瘦高。
+   * 
+   * 
+   * 
+   */
   // Fill matches and landmarks for each correspondence
   std::normal_distribution<double> range_normal_dist(0, params.landmark_relative_range_noise);
   for (int i = 0; i < params.num_landmarks; i++) {
+    // 计算深度
     const double source_range = 1 / source_inverse_ranges[i];
+    // sym::Clamp确保(1 + range_normal_dist(gen))的值在[0.5, 2.0]之间
     const double range_perturbation = sym::Clamp(1 + range_normal_dist(gen), 0.5, 2.0);
+    // 给深度一个扰动，再转换为逆深度
     values->Set({Var::LANDMARK, i}, 1 / (source_range * range_perturbation));
 
     const auto& correspondence = correspondences[i];
-
+    // {Var::MATCH_SOURCE_COORDS, 1, i}参数里面的1，应该表示是相机1的参数，values里面存储键值对，类似dictionary
     values->Set({Var::MATCH_SOURCE_COORDS, 1, i}, correspondence.source_uv);
     values->Set({Var::MATCH_TARGET_COORDS, 1, i}, correspondence.target_uv);
     values->Set({Var::MATCH_WEIGHT, 1, i}, correspondence.is_valid);
@@ -168,6 +208,7 @@ void AddCorrespondences(const std::vector<sym::PosedCamera<sym::LinearCameraCald
  * Build the Values for a small bundle adjustment problem.  Generates multiple posed cameras, with
  * Gaussian priors on their relative poses, as well as noisy correspondences and landmarks.
  */
+// 为一个小BA问题建立Values.
 sym::Valuesd BuildValues(std::mt19937& gen, const BundleAdjustmentProblemParams& params) {
   sym::Valuesd values;
 
@@ -176,11 +217,16 @@ sym::Valuesd BuildValues(std::mt19937& gen, const BundleAdjustmentProblemParams&
   // The factors we use have variable convexity, for use as a tunable robust cost or in an iterative
   // Graduated Non-Convexity (GNC) optimization.  See the GncFactor docstring for more
   // information.
+  // 我们使用的因子具有可变凸性，用于可调鲁棒代价或迭代分级非凸性优化。
+  // 有关更多信息，请参见GncFactor中的文档字符串。
   values.Set({Var::GNC_SCALE}, params.reprojection_error_gnc_scale);
   values.Set(Var::GNC_MU, 0.0);
 
+  // 添加相机内参、位姿
   const auto cams = AddViews(params, gen, &values);
+  // 添加经过扰动的相对位姿先验，以及添加信息矩阵平方根先验
   AddPosePriors(cams, params, gen, &values);
+  // 添加目标相机对应于源相机的correspondences(观测)
   AddCorrespondences(cams, params, gen, &values);
 
   return values;

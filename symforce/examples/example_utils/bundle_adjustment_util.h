@@ -25,6 +25,8 @@ struct Correspondence {
 };
 
 // Generate correspondences in the target camera given observations in the source camera.
+// 给定源相机中的观测，生成目标相机里的correspondences
+// 在源相机中给定的观测结果，在目标相机中生成对应关系。
 template <typename Scalar>
 std::vector<Correspondence<Scalar>> GenerateCorrespondences(
     const sym::PosedCamera<sym::LinearCameraCal<Scalar>>& source_cam,
@@ -41,7 +43,7 @@ std::vector<Correspondence<Scalar>> GenerateCorrespondences(
     Correspondence<Scalar> correspondence;
     correspondence.source_uv = source_uv;
 
-    if (correspondences.size() < num_outliers) {
+    if (correspondences.size() < num_outliers) { // 如果num_outliers>0 生成一些outliers
       std::uniform_real_distribution<Scalar> uniform_dist_u(0, source_cam.ImageSize()(1));
       std::uniform_real_distribution<Scalar> uniform_dist_v(0, source_cam.ImageSize()(0));
 
@@ -83,6 +85,8 @@ std::vector<Eigen::Matrix<Scalar, 2, 1>> SampleRegularGrid(const Eigen::Vector2i
 
 // Given an image shape, pick a sparse but distributed set of points by
 // generating a grid and then shuffling and randomly selecting from that set.
+// 给定一个图像形状，通过生成一个网格来选择一个稀疏但分布的点集合，然后进行变换并从该集合中随机选择。
+// 生成一个网格，然后洗牌并从该集合中随机选择。
 template <typename Scalar>
 std::vector<Eigen::Matrix<Scalar, 2, 1>> PickSourceCoordsRandomlyFromGrid(
     const Eigen::Vector2i& image_shape, const int num_coords, std::mt19937& gen,
@@ -103,6 +107,7 @@ std::vector<Eigen::Matrix<Scalar, 2, 1>> PickSourceCoordsRandomlyFromGrid(
 
 // Sample a number of inverse ranges with a uniform distribution in range
 // between the given values.
+// 在给定值之间的范围内以均匀分布的若干逆范围进行抽样。
 template <typename Scalar>
 std::vector<Scalar> SampleInverseRanges(const size_t num, std::mt19937& gen,
                                         const bool at_infinity = false, const Scalar close_m = 2.5,
@@ -113,6 +118,9 @@ std::vector<Scalar> SampleInverseRanges(const size_t num, std::mt19937& gen,
 
   std::vector<Scalar> inverse_ranges;
   for (size_t i = 0; i < num; i++) {
+    // 运算符()：此函数返回给定范围内的随机值
+    // 均匀分布dist(gen)产生一个位于区间[close_m, far_m)的随机数，随机数是均匀分布的
+    // 谈到分布，产生的都是一个位于定义域的随机变量
     inverse_ranges.push_back(1 / dist(gen));
   }
 
