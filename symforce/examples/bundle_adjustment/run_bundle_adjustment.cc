@@ -154,10 +154,12 @@ void RunBundleAdjustment() {
   // Create and set up Optimizer
   // step2 建立因子图
   const std::vector<sym::Factord> factors = BuildFactors(params);
+  // 计算除了view0之外的optimized keys
   const std::vector<sym::Key> optimized_keys = ComputeKeysToOptimizeWithoutView0(factors);
 
   const sym::optimizer_params_t optimizer_params = sym::example_utils::OptimizerParams();
 
+  // 构造优化器
   sym::Optimizerd optimizer(optimizer_params, factors, "BundleAdjustmentOptimizer", optimized_keys,
                             params.epsilon);
 
