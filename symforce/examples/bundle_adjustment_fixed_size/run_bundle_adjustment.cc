@@ -13,8 +13,28 @@
 #include "./build_example_state.h"
 #include "symforce/bundle_adjustment_fixed_size/linearization.h"
 
+/*
+ *
+ * add comments by wxliu:
+ * 
+ * This is the C++ file that actually runs the optimization. 
+ * It builds up the Values for the problem and builds a factor graph. 
+ * In this example, the C++ optimization consists of one sym::Factor, 
+ * with a single generated linearization function that contains all of the symbolic residuals.
+ *
+ * This particular example is set up so that the number of cameras and landmarks is set at code generation time;
+ * in contrast, the Bundle Adjustment example shows how to make them configurable at runtime.
+ * 
+ * 在代码生成时（python代码生成c++代码）固定最小二乘问题的大小（相机和路标点的个数固定），能产生更有效率的线性化函数
+ * 因为常见的子表达式消除可以应用于多个因子。
+ * 例如，将不同的特征重新投影到同一台相机中的多个因子通常会共享计算量。
+ * 比如相对位姿，就可以提前计算好，作为子表达式固定下来
+ * 
+ */
+
 namespace bundle_adjustment_fixed_size {
 
+// 在本例中，C++优化由一个sym::Factor因子组成，带有 一个包含所有符号残差的单一生成的线性化函数。 
 sym::Factord BuildFactor() {
   const std::vector<sym::Key> factor_keys = {{Var::CALIBRATION, 0},
                                              {Var::VIEW, 0},
@@ -28,7 +48,7 @@ sym::Factord BuildFactor() {
                                              {Var::POSE_PRIOR_SQRT_INFO, 1, 0},
                                              {Var::POSE_PRIOR_T, 1, 1},
                                              {Var::POSE_PRIOR_SQRT_INFO, 1, 1},
-                                             {Var::MATCH_SOURCE_COORDS, 1, 0},
+                                             {Var::MATCH_SOURCE_COORDS, 1, 0}, // 这里的1代表view 1, 而0代表landmark 0
                                              {Var::MATCH_TARGET_COORDS, 1, 0},
                                              {Var::MATCH_WEIGHT, 1, 0},
                                              {Var::LANDMARK_PRIOR, 1, 0},
@@ -160,11 +180,13 @@ sym::Factord BuildFactor() {
       {Var::LANDMARK, 15}, {Var::LANDMARK, 16}, {Var::LANDMARK, 17}, {Var::LANDMARK, 18},
       {Var::LANDMARK, 19}};
 
+  // 分别构造的factor keys和optimized keys 用来构造因子图
   return sym::Factord::Hessian(bundle_adjustment_fixed_size::Linearization<double>, factor_keys,
                                optimized_keys);
 }
 
 void RunBundleAdjustment() {
+  // 优化三步骤几无差别，详见bundle_adjustment
   // Create initial state
   std::mt19937 gen(42);
   const auto params = BundleAdjustmentProblemParams();
