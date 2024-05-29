@@ -58,7 +58,7 @@ void RunLocalization() {
   // 根据优化参数和因子构造优化对象
   sym::Optimizer<double> optimizer(params, factors);
 
-  // 建立Valuse
+  // 建立Values
   sym::Values<double> values;
   for (int i = 0; i < num_poses; ++i) {
     values.Set({'P', i}, sym::Pose2d::Identity()); // 设置位姿初值为单位帧

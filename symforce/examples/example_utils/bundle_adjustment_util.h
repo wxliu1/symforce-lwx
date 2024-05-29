@@ -49,9 +49,11 @@ std::vector<Correspondence<Scalar>> GenerateCorrespondences(
 
       correspondence.target_uv =
           Eigen::Matrix<Scalar, 2, 1>(uniform_dist_u(gen), uniform_dist_v(gen));
+      // 判断点是否在图像边界以内，返回1(in)或者0(out)    
       correspondence.is_valid = target_cam.InView(correspondence.target_uv, target_cam.ImageSize());
     } else {
       // Warp the point to the target
+      // 变换点到目标图像
       const Eigen::Matrix<Scalar, 2, 1> target_uv_perfect = source_cam.WarpPixel(
           source_uv, inverse_range, target_cam, epsilon, &correspondence.is_valid);
 

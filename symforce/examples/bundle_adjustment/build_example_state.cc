@@ -180,7 +180,6 @@ void AddCorrespondences(const std::vector<sym::PosedCamera<sym::LinearCameraCald
    * σ描述正态分布资料数据分布的离散程度，σ越大，数据分布越分散，σ越小，数据分布越集中。也称为是正态分布的形状参数，σ越大，曲线越扁平，反之，σ越小，曲线越瘦高。
    * 
    * 
-   * 
    */
   // Fill matches and landmarks for each correspondence
   std::normal_distribution<double> range_normal_dist(0, params.landmark_relative_range_noise);
@@ -196,7 +195,7 @@ void AddCorrespondences(const std::vector<sym::PosedCamera<sym::LinearCameraCald
     // {Var::MATCH_SOURCE_COORDS, 1, i}参数里面的1，应该表示是相机1的参数，values里面存储键值对，类似dictionary
     values->Set({Var::MATCH_SOURCE_COORDS, 1, i}, correspondence.source_uv);
     values->Set({Var::MATCH_TARGET_COORDS, 1, i}, correspondence.target_uv);
-    values->Set({Var::MATCH_WEIGHT, 1, i}, correspondence.is_valid);
+    values->Set({Var::MATCH_WEIGHT, 1, i}, correspondence.is_valid); // 点有效权重为1，否则为0
     values->Set({Var::LANDMARK_PRIOR, 1, i}, source_inverse_ranges[i]);
     values->Set({Var::LANDMARK_PRIOR_SIGMA, 1, i}, 100.0);
   }
@@ -219,8 +218,23 @@ sym::Valuesd BuildValues(std::mt19937& gen, const BundleAdjustmentProblemParams&
   // information.
   // 我们使用的因子具有可变凸性，用于可调鲁棒代价或迭代分级非凸性优化。
   // 有关更多信息，请参见GncFactor中的文档字符串。
-  values.Set({Var::GNC_SCALE}, params.reprojection_error_gnc_scale);
-  values.Set(Var::GNC_MU, 0.0);
+
+  /*
+   *
+   * class BarronNoiseModel
+   *
+   * barron_loss(x) = delta^2 * (b/d) * (( scalar_information * (x/delta)^2 / b + 1)^(d/2) - 1)
+   * where: 
+   * b = |alpha - 2| + epsilon
+   * d = alpha + epsilon if alpha >= 0 else alpha - epsilon
+   *
+   */
+
+  // 以下两个参数用于类BarronNoiseModel的，噪声模型相关的两个量
+  // 尺度参数 The scale parameter
+  values.Set({Var::GNC_SCALE}, params.reprojection_error_gnc_scale); 
+  // μ凸性参数The mu convexity parameter 范围0->1, 用于计算参数alpha
+  values.Set(Var::GNC_MU, 0.0); 
 
   // 添加相机内参、位姿
   const auto cams = AddViews(params, gen, &values);

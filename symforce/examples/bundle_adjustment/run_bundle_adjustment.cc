@@ -20,13 +20,16 @@ namespace bundle_adjustment {
 /**
  * Creates a factor for a prior on the relative pose between view i and view j
  */
+// 为视图i和j之间的相对位姿先验，创建一个因子
 sym::Factord CreateRelativePosePriorFactor(const int i, const int j) {
   return sym::Factord::Hessian(sym::BetweenFactorPose3<double>,
+                               // 输入参数keys: 视图i和视图j, 视图i和j之间的相对位姿先验，以及相对位姿先验的权重信息矩阵的平方根
                                {{Var::VIEW, i},
                                 {Var::VIEW, j},
                                 {Var::POSE_PRIOR_T, i, j},
                                 {Var::POSE_PRIOR_SQRT_INFO, i, j},
                                 Var::EPSILON},
+                               // 优化参数的keys: 这里指示优化视图i和视图j的位姿
                                {
                                    {Var::VIEW, i},
                                    {Var::VIEW, j},
@@ -37,6 +40,7 @@ sym::Factord CreateRelativePosePriorFactor(const int i, const int j) {
  * Creates a factor for a prior on the inverse range of landmark landmark_idx based on its initial
  * triangulation between view 0 and view i
  */
+// 为基于视图0和i之间的初始三角测量的路标landmark_idx的逆范围先验，创建一个因子
 sym::Factord CreateInverseRangeLandmarkPriorFactor(const int i, const int landmark_idx) {
   return sym::Factord::Hessian(sym::InverseRangeLandmarkPriorFactor<double>,
                                {{Var::LANDMARK, landmark_idx},
@@ -44,12 +48,14 @@ sym::Factord CreateInverseRangeLandmarkPriorFactor(const int i, const int landma
                                 {Var::MATCH_WEIGHT, i, landmark_idx},
                                 {Var::LANDMARK_PRIOR_SIGMA, i, landmark_idx},
                                 Var::EPSILON},
+                               // 优化参数的key: 指示优化路标的逆深度 
                                {{Var::LANDMARK, landmark_idx}});
 }
 
 /**
  * Creates a factor for a reprojection error residual of landmark landmark_idx projected into view i
  */
+// 为投影到视图i的路标landmark_idx的重投影残差，创建一个因子
 sym::Factord CreateInverseRangeLandmarkGncFactor(const int i, const int landmark_idx) {
   return sym::Factord::Hessian(sym::InverseRangeLandmarkLinearGncFactor<double>,
                                {{Var::VIEW, 0},
@@ -63,6 +69,7 @@ sym::Factord CreateInverseRangeLandmarkGncFactor(const int i, const int landmark
                                 Var::GNC_MU,
                                 Var::GNC_SCALE,
                                 Var::EPSILON},
+                               // 以下为keys to optimize, 指示优化的状态量为：视图i的位姿，视图j的位姿，以及路标点landmark_idx的逆深度
                                {
                                    {Var::VIEW, 0},
                                    {Var::VIEW, i},
@@ -80,13 +87,15 @@ std::vector<sym::Factord> BuildFactors(const BundleAdjustmentProblemParams& para
         continue;
       }
 
+      // 创建相对位姿先验因子
       factors.push_back(CreateRelativePosePriorFactor(i, j));
     }
   }
 
   // Inverse range priors
-  for (int i = 1; i < params.num_views; i++) {
+  for (int i = 1; i < params.num_views; i++) { // 注意视图序号是从1开始的，主要是因为只有2帧
     for (int landmark_idx = 0; landmark_idx < params.num_landmarks; landmark_idx++) {
+      // 创建逆范围先验因子
       factors.push_back(CreateInverseRangeLandmarkPriorFactor(i, landmark_idx));
     }
   }
@@ -94,6 +103,7 @@ std::vector<sym::Factord> BuildFactors(const BundleAdjustmentProblemParams& para
   // Reprojection errors
   for (int i = 1; i < params.num_views; i++) {
     for (int landmark_idx = 0; landmark_idx < params.num_landmarks; landmark_idx++) {
+      // 创建重投影残差因子
       factors.push_back(CreateInverseRangeLandmarkGncFactor(i, landmark_idx));
     }
   }
@@ -129,6 +139,7 @@ void RunBundleAdjustment() {
   // Create initial state
   std::mt19937 gen(42);
   const auto params = BundleAdjustmentProblemParams();
+  // step1 为最小二乘问题建立Values
   sym::Valuesd values = BuildValues(gen, params);
 
   spdlog::info("Initial State:");
@@ -141,6 +152,7 @@ void RunBundleAdjustment() {
   }
 
   // Create and set up Optimizer
+  // step2 建立因子图
   const std::vector<sym::Factord> factors = BuildFactors(params);
   const std::vector<sym::Key> optimized_keys = ComputeKeysToOptimizeWithoutView0(factors);
 
@@ -150,6 +162,7 @@ void RunBundleAdjustment() {
                             params.epsilon);
 
   // Optimize
+  // step3 执行BA
   const sym::Optimizerd::Stats stats = optimizer.Optimize(values);
 
   // Print out results
