@@ -113,6 +113,7 @@ class FixedBundleAdjustmentProblem:
         Build the symbolic residual for which we will minimize the sum of squares.
         """
         residual = Values()
+        # 三种残差：位姿先验残差，重投影残差，逆深度先验残差
         residual["pose_prior"] = []
         residual["reprojection"] = []
         residual["inv_range_prior"] = []

@@ -47,6 +47,7 @@ enum Var : char {
  * Build the Values for a small bundle adjustment problem.  Generates multiple posed cameras, with
  * Gaussian priors on their relative poses, as well as noisy correspondences and landmarks.
  */
+// 创建values用于状态量的优化
 sym::Valuesd BuildValues(std::mt19937& gen, const BundleAdjustmentProblemParams& params);
 
 }  // namespace bundle_adjustment_fixed_size

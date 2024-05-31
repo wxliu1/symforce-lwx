@@ -37,23 +37,32 @@ def snavely_reprojection_residual(
     Returns:
         residual: The reprojection residual
     """
+    # 具有2个畸变系数的多项式畸变相机模型, cx==cy==0, fx==fy
     focal_length, k1, k2 = intrinsics
 
     # Here we're writing the projection ourselves because this isn't a camera model provided by
     # SymForce.  For cameras in `symforce.cam` we could just create a `sf.PosedCamera` and call
     # `camera.pixel_from_global_point` instead, or we could create a subclass of `sf.CameraCal` and
     # do that.
+    # 转换为相机系3d坐标
     point_cam = cam_T_world * point
 
+    # 转换为归一化平面的2d坐标
+    # point_cam[:2]表示取前2维
     p = sf.V2(point_cam[:2]) / sf.Max(-point_cam[2], epsilon)
 
+    # 径向畸变多项式: 1 + k_1r^2 + k_2r^4
     r = 1 + k1 * p.squared_norm() + k2 * p.squared_norm() ** 2
 
+    # r * p 是畸变后的归一化平面2d坐标，再乘以焦距，得到在图像上的正确坐标
     pixel_projected = focal_length * r * p
 
+    # 预测值减去实际值：投影后的正确像素平面坐标 减去测量坐标
     return pixel_projected - pixel
 
 
+# 生成代码时，经常出现rhs, 其表示right-hand side, 表示的是GN方程式J^T{\delta}x=-J^Tr的右侧部分
+# Gauss-Newton rhs 表示高斯牛顿线性方程的右侧部分
 def generate(output_dir: Path) -> None:
     """
     Generates the snavely_reprojection_factor into C++, as well as a set of Keys to help construct

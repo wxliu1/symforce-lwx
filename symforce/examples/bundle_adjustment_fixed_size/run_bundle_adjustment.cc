@@ -35,6 +35,7 @@
 namespace bundle_adjustment_fixed_size {
 
 // 在本例中，C++优化由一个sym::Factor因子组成，带有 一个包含所有符号残差的单一生成的线性化函数。 
+// 固定size的BA和非固定BA, 区别在于前者，相机位姿个数，路标点个数，匹配的特征（correspondences）个数都是固定的
 sym::Factord BuildFactor() {
   const std::vector<sym::Key> factor_keys = {{Var::CALIBRATION, 0},
                                              {Var::VIEW, 0},

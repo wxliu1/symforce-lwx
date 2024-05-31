@@ -77,10 +77,12 @@ sym::Factord CreateInverseRangeLandmarkGncFactor(const int i, const int landmark
                                });
 }
 
+// 残差总共72维，充分说明：一个残差对应一个因子，或者说一个因子对应一个残差
 std::vector<sym::Factord> BuildFactors(const BundleAdjustmentProblemParams& params) {
   std::vector<sym::Factord> factors;
 
   // Relative pose priors
+  // 相对位姿先验的残差维数：6 * 2 = 12
   for (int i = 0; i < params.num_views; i++) {
     for (int j = 0; j < params.num_views; j++) {
       if (i == j) {
@@ -93,6 +95,7 @@ std::vector<sym::Factord> BuildFactors(const BundleAdjustmentProblemParams& para
   }
 
   // Inverse range priors
+  // 逆范围先验的残差维数：1 * 20 = 20
   for (int i = 1; i < params.num_views; i++) { // 注意视图序号是从1开始的，主要是因为只有2帧
     for (int landmark_idx = 0; landmark_idx < params.num_landmarks; landmark_idx++) {
       // 创建逆范围先验因子
@@ -101,6 +104,7 @@ std::vector<sym::Factord> BuildFactors(const BundleAdjustmentProblemParams& para
   }
 
   // Reprojection errors
+  // 重投影误差的维数：2 * 20 = 40
   for (int i = 1; i < params.num_views; i++) {
     for (int landmark_idx = 0; landmark_idx < params.num_landmarks; landmark_idx++) {
       // 创建重投影残差因子
