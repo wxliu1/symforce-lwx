@@ -52,7 +52,7 @@ class FixedBundleAdjustmentProblem:
         """
 
         logger.debug("Generating linearization function for fixed-size problem")
-
+        # 使用隐式函数代码生成
         linearization_func = self._build_codegen_object()
 
         namespace = "bundle_adjustment_fixed_size"
@@ -69,6 +69,7 @@ class FixedBundleAdjustmentProblem:
         inputs = Values(**{flat_keys[key]: value for key, value in self.values.items_recursive()})
         outputs = Values(residual=sf.M(self.residual.to_storage()))
 
+        # 使用输入变量和作为这些变量函数的输出表达式列表来查看生成函数
         linearization_func = codegen.Codegen(
             inputs=inputs,
             outputs=outputs,

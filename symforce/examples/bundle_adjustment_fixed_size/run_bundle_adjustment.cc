@@ -181,6 +181,7 @@ sym::Factord BuildFactor() {
       {Var::LANDMARK, 19}};
 
   // 分别构造的factor keys和optimized keys 用来构造因子图
+  // 符号表达式生成的Linearization函数在这里用上了
   return sym::Factord::Hessian(bundle_adjustment_fixed_size::Linearization<double>, factor_keys,
                                optimized_keys);
 }
@@ -190,6 +191,9 @@ void RunBundleAdjustment() {
   // Create initial state
   std::mt19937 gen(42);
   const auto params = BundleAdjustmentProblemParams();
+  //- 这里build values用于最小二乘问题优化，是真正需要优化的状态量
+  //- 而python脚本里面的build values用于输出线性化符号表达式，用于因子图构造
+  //- 作用完全不一样，需要特别地注意！
   sym::Valuesd values = BuildValues(gen, params);
 
   spdlog::info("Initial State:");

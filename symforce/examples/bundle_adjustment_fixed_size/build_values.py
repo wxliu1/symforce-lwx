@@ -6,6 +6,7 @@
 """
 This file builds a Values with all symbols needed for the fixed-size example.
 """
+# 该文件 build values的用途：主要用于创建线性化的符号表达式
 
 import symforce.symbolic as sf
 from symforce.values import Values
