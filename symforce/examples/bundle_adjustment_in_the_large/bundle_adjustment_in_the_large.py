@@ -72,6 +72,7 @@ def generate(output_dir: Path) -> None:
     """
 
     # Generate the residual function (see `gen/snavely_reprojection_factor.h`)
+    # which_args列表里的参数是待优化的状态量，也是线性化时残差函数对这些状态量求偏导
     codegen.Codegen.function(snavely_reprojection_residual, codegen.CppConfig()).with_linearization(
         which_args=["cam_T_world", "intrinsics", "point"]
     ).generate_function(output_dir=output_dir, skip_directory_nesting=True)
@@ -86,6 +87,7 @@ def generate(output_dir: Path) -> None:
         epsilon=sf.Scalar(),
     )
 
+    # 为每个变量生成key
     values_codegen.generate_values_keys(
         values, output_dir, config=codegen.CppConfig(), skip_directory_nesting=True
     )

@@ -41,9 +41,11 @@ class FixedBundleAdjustmentProblem:
         self.num_landmarks = num_landmarks
 
         # Define symbols and store them in a Values object
+        # 定义符号
         self.values = build_values(num_views=num_views, num_landmarks=num_landmarks)
 
         # Build residual
+        # 建立残差
         self.residual = self._build_residual()
 
     def generate(self, output_dir: T.Openable) -> None:
