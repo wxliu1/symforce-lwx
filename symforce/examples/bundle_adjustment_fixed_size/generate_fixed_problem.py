@@ -72,6 +72,7 @@ class FixedBundleAdjustmentProblem:
         outputs = Values(residual=sf.M(self.residual.to_storage()))
 
         # 使用输入变量和作为这些变量函数的输出表达式列表来查看生成函数
+        # 英文原话：we look at generating functions using a list of input variables and output expressions that are a function of those variables.
         linearization_func = codegen.Codegen(
             inputs=inputs,
             outputs=outputs,
