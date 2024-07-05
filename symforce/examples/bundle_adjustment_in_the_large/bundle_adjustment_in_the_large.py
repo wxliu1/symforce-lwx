@@ -62,7 +62,7 @@ def snavely_reprojection_residual(
 
 
 # 生成代码时，经常出现rhs, 其表示right-hand side, 表示的是GN方程式J^T{\delta}x=-J^Tr的右侧部分
-# Gauss-Newton rhs 表示高斯牛顿线性方程的右侧部分
+# Gauss-Newton rhs 表示高斯牛顿线性方程的右侧部分, 很有可能没有负号，即rhs = J^T * r
 def generate(output_dir: Path) -> None:
     """
     Generates the snavely_reprojection_factor into C++, as well as a set of Keys to help construct
