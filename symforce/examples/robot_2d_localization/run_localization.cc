@@ -35,6 +35,9 @@ void RunLocalization() {
   for (int i = 0; i < num_poses; ++i) {
     for (int j = 0; j < num_landmarks; ++j) {
       factors.push_back(sym::Factor<double>::Hessian(
+          // @param keys_to_func: The set of input arguments, in order, accepted by func. func按顺序接受的一组输入参数。
+          // @param keys_to_optimize: The set of input arguments that correspond to the derivative in func. 与func中的导数相对应的一组输入自变量。
+          // Must be a subset of keys_to_func. If empty, then all keys_to_func are optimized. 必须是keys_to_func的子集。如果为空，则优化所有key_to_func。
           // 参数: 位姿i、路标、方位角度测量、epsilon
           // 优化参数：位姿i
           sym::BearingFactor<double>, {{'P', i}, {'L', j}, {'a', i, j}, {'e'}},  // keys
